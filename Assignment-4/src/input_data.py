@@ -1,49 +1,19 @@
-#!/usr/bin/env python
-
 """Functions for downloading and reading MNIST data."""
-import gzip
+from skimage import io 
 import os
-from six.moves.urllib.request import urlretrieve
 import numpy
-SOURCE_URL = 'http://yann.lecun.com/exdb/mnist/'
 
-
-def maybe_download(filename, work_directory):
-    """Download the data from Yann's website, unless it's already here."""
-    if not os.path.exists(work_directory):
-        os.mkdir(work_directory)
-    filepath = os.path.join(work_directory, filename)
-    if not os.path.exists(filepath):
-        filepath, _ = urlretrieve(SOURCE_URL + filename, filepath)
-        statinfo = os.stat(filepath)
-        print('Succesfully downloaded', filename, statinfo.st_size, 'bytes.')
-    return filepath
-
-
-def _read32(bytestream):
-    dt = numpy.dtype(numpy.uint32).newbyteorder('>')
-    return numpy.frombuffer(bytestream.read(4), dtype=dt)
-
-
-def extract_images(filename):
+def extract_images(dir,N):
+    # dir = "../data/valid/"
+    # N
     """Extract the images into a 4D uint8 numpy array [index, y, x, depth]."""
-    print('Extracting', filename)
-    with gzip.open(filename) as bytestream:
-        magic = _read32(bytestream)
-        if magic != 2051:
-            raise ValueError(
-                'Invalid magic number %d in MNIST image file: %s' %
-                (magic, filename))
-        num_images = _read32(bytestream)
-        rows = _read32(bytestream)
-        cols = _read32(bytestream)
-        buf = bytestream.read(rows * cols * num_images)
-        data = numpy.frombuffer(buf, dtype=numpy.uint8)
-        data = data.reshape(num_images, rows, cols, 1)
-        return data
+    training_inputs = numpy.asarray([io.imread(dir+str(i)+'.png') for i in range(N)])
+    (x,y,z) = training_inputs.shape
+    training_inputs = training_inputs.reshape(x, y, z, 1)
+    return training_inputs
 
 
-def dense_to_one_hot(labels_dense, num_classes=10):
+def dense_to_one_hot(labels_dense, num_classes=104):
     """Convert class labels from scalars to one-hot vectors."""
     num_labels = labels_dense.shape[0]
     index_offset = numpy.arange(num_labels) * num_classes
@@ -52,40 +22,32 @@ def dense_to_one_hot(labels_dense, num_classes=10):
     return labels_one_hot
 
 
-def extract_labels(filename, one_hot=False):
-    """Extract the labels into a 1D uint8 numpy array [index]."""
-    print('Extracting', filename)
-    with gzip.open(filename) as bytestream:
-        magic = _read32(bytestream)
-        if magic != 2049:
-            raise ValueError(
-                'Invalid magic number %d in MNIST label file: %s' %
-                (magic, filename))
-        num_items = _read32(bytestream)
-        buf = bytestream.read(num_items)
-        labels = numpy.frombuffer(buf, dtype=numpy.uint8)
-        if one_hot:
-            return dense_to_one_hot(labels)
-        return labels
+# def extract_labels(filename, one_hot=False):
+def extract_labels(dir):
+    labels = []
+    with open(dir+'labels.txt','rb') as f:
+        for line in f:
+            labels.append(int(line.split()[0]))
+    labels = numpy.asarray(labels,dtype=numpy.uint8)
+    return dense_to_one_hot(labels)
+
 
 
 class DataSet(object):
-    def __init__(self, images, labels, fake_data=False):
-        if fake_data:
-            self._num_examples = 10000
-        else:
-            assert images.shape[0] == labels.shape[0], (
-                "images.shape: %s labels.shape: %s" % (images.shape,
-                                                       labels.shape))
-            self._num_examples = images.shape[0]
-            # Convert shape from [num examples, rows, columns, depth]
-            # to [num examples, rows*columns] (assuming depth == 1)
-            assert images.shape[3] == 1
-            images = images.reshape(images.shape[0],
-                                    images.shape[1] * images.shape[2])
-            # Convert from [0, 255] -> [0.0, 1.0].
-            images = images.astype(numpy.float32)
-            images = numpy.multiply(images, 1.0 / 255.0)
+    def __init__(self, images, labels):
+
+        assert images.shape[0] == labels.shape[0], (
+            "images.shape: %s labels.shape: %s" % (images.shape,
+                                                   labels.shape))
+        self._num_examples = images.shape[0]
+        # Convert shape from [num examples, rows, columns, depth]
+        # to [num examples, rows*columns] (assuming depth == 1)
+        assert images.shape[3] == 1
+        images = images.reshape(images.shape[0],
+                                images.shape[1] * images.shape[2])
+        # Convert from [0, 255] -> [0.0, 1.0].
+        images = images.astype(numpy.float32)
+        images = numpy.multiply(images, 1.0 / 255.0)
         self._images = images
         self._labels = labels
         self._epochs_completed = 0
@@ -107,13 +69,8 @@ class DataSet(object):
     def epochs_completed(self):
         return self._epochs_completed
 
-    def next_batch(self, batch_size, fake_data=False):
+    def next_batch(self, batch_size):
         """Return the next `batch_size` examples from this data set."""
-        if fake_data:
-            fake_image = [1.0 for _ in xrange(784)]
-            fake_label = 0
-            return [fake_image for _ in xrange(batch_size)], [
-                fake_label for _ in xrange(batch_size)]
         start = self._index_in_epoch
         self._index_in_epoch += batch_size
         if self._index_in_epoch > self._num_examples:
@@ -132,33 +89,18 @@ class DataSet(object):
         return self._images[start:end], self._labels[start:end]
 
 
-def read_data_sets(train_dir, fake_data=False, one_hot=False):
+def read_data_sets(train_dir):
     class DataSets(object):
         pass
     data_sets = DataSets()
-    if fake_data:
-        data_sets.train = DataSet([], [], fake_data=True)
-        data_sets.validation = DataSet([], [], fake_data=True)
-        data_sets.test = DataSet([], [], fake_data=True)
-        return data_sets
-    TRAIN_IMAGES = 'train-images-idx3-ubyte.gz'
-    TRAIN_LABELS = 'train-labels-idx1-ubyte.gz'
-    TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
-    TEST_LABELS = 't10k-labels-idx1-ubyte.gz'
-    VALIDATION_SIZE = 5000
-    local_file = maybe_download(TRAIN_IMAGES, train_dir)
-    train_images = extract_images(local_file)
-    local_file = maybe_download(TRAIN_LABELS, train_dir)
-    train_labels = extract_labels(local_file, one_hot=one_hot)
-    local_file = maybe_download(TEST_IMAGES, train_dir)
-    test_images = extract_images(local_file)
-    local_file = maybe_download(TEST_LABELS, train_dir)
-    test_labels = extract_labels(local_file, one_hot=one_hot)
-    validation_images = train_images[:VALIDATION_SIZE]
-    validation_labels = train_labels[:VALIDATION_SIZE]
-    train_images = train_images[VALIDATION_SIZE:]
-    train_labels = train_labels[VALIDATION_SIZE:]
+
+    dir = "../data/valid/"
+
+    train_labels = extract_labels(train_dir)
+    N = train_labels.shape[0]
+    train_images = extract_images(train_dir,N)
+
     data_sets.train = DataSet(train_images, train_labels)
-    data_sets.validation = DataSet(validation_images, validation_labels)
-    data_sets.test = DataSet(test_images, test_labels)
+    # data_sets.validation = DataSet(validation_images, validation_labels)
+    # data_sets.test = DataSet(test_images, test_labels)
     return data_sets

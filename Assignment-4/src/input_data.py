@@ -2,12 +2,13 @@
 from skimage import io 
 import os
 import numpy
+from scipy import misc
 
 def extract_images(dir,N):
     # dir = "../data/valid/"
     # N
     """Extract the images into a 4D uint8 numpy array [index, y, x, depth]."""
-    training_inputs = numpy.asarray([io.imread(dir+str(i)+'.png') for i in range(N)])
+    training_inputs = numpy.asarray([misc.imresize(255.0 - io.imread(dir+str(i)+'.png'),50) for i in range(N)])
     (x,y,z) = training_inputs.shape
     training_inputs = training_inputs.reshape(x, y, z, 1)
     return training_inputs
@@ -89,18 +90,23 @@ class DataSet(object):
         return self._images[start:end], self._labels[start:end]
 
 
-def read_data_sets(train_dir):
+def read_data_sets(tr_dir,va_dir):
     class DataSets(object):
         pass
     data_sets = DataSets()
 
-    dir = "../data/valid/"
+    #dir = "../data/valid/"
 
-    train_labels = extract_labels(train_dir)
+    train_labels = extract_labels(tr_dir)
     N = train_labels.shape[0]
-    train_images = extract_images(train_dir,N)
+    train_images = extract_images(tr_dir,N)
+    
+    test_labels = extract_labels(va_dir)
+    N = test_labels.shape[0]
+    test_images = extract_images(va_dir,N)
 
     data_sets.train = DataSet(train_images, train_labels)
     # data_sets.validation = DataSet(validation_images, validation_labels)
-    # data_sets.test = DataSet(test_images, test_labels)
+    data_sets.test = DataSet(test_images, test_labels)
+    print "Data reading complete"
     return data_sets

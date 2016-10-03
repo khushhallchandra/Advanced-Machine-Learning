@@ -21,15 +21,15 @@ def model(X, w_h, w_h2, w_o, p_keep_input, p_keep_hidden): # this network is the
     return tf.matmul(h2, w_o)
 
 
-mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+mnist = input_data.read_data_sets("../data/train/","../data/valid/")
 trX, trY, teX, teY = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
 
-X = tf.placeholder("float", [None, 784])
-Y = tf.placeholder("float", [None, 10])
+X = tf.placeholder("float", [None, 160*160])
+Y = tf.placeholder("float", [None, 104])
 
-w_h = init_weights([784, 625])
-w_h2 = init_weights([625, 625])
-w_o = init_weights([625, 10])
+w_h = init_weights([160*160, 160*16])
+w_h2 = init_weights([160*16, 160*16])
+w_o = init_weights([160*16, 104])
 
 p_keep_input = tf.placeholder("float")
 p_keep_hidden = tf.placeholder("float")
@@ -44,11 +44,13 @@ with tf.Session() as sess:
     # you need to initialize all variables
     tf.initialize_all_variables().run()
 
-    for i in range(100):
-        for start, end in zip(range(0, len(trX), 128), range(128, len(trX)+1, 128)):
-            sess.run(train_op, feed_dict={X: trX[start:end], Y: trY[start:end],
-                                          p_keep_input: 0.8, p_keep_hidden: 0.5})
+    for i in range(10):
+	print "epoch-------------------------",i
+        for start, end in zip(range(0, len(trX), 1000), range(1000, len(trX)+1, 1000)):
+            sess.run(train_op, feed_dict={X: trX[start:end], Y: trY[start:end],p_keep_input: 0.8, p_keep_hidden: 0.5})
+	    print "descent started",start
         print(i, np.mean(np.argmax(teY, axis=1) ==
                          sess.run(predict_op, feed_dict={X: teX, Y: teY,
                                                          p_keep_input: 1.0,
                                                          p_keep_hidden: 1.0})))
+

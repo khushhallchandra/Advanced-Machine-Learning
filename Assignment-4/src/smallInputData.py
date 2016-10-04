@@ -8,8 +8,7 @@ def extract_images(dir,N):
     # dir = "../data/valid/"
     # N
     """Extract the images into a 4D uint8 numpy array [index, y, x, depth]."""
-    # resize image to 50%
-    training_inputs = numpy.asarray([misc.imresize(255.0 - io.imread(dir+str(i)+'.png'),50) for i in range(N)])
+    training_inputs = numpy.asarray([io.imread(dir+str(i)+'.png') for i in range(N)])
     (x,y,z) = training_inputs.shape
     training_inputs = training_inputs.reshape(x, y, z, 1)
     return training_inputs
@@ -92,8 +91,6 @@ class DataSet(object):
 
 
 def read_data_sets(tr_dir,va_dir):
-    # tr_dir = "../data/train/"
-    # va_dir = ""../data/valid/""
     class DataSets(object):
         pass
     data_sets = DataSets()

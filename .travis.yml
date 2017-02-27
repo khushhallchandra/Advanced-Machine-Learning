@@ -7,7 +7,7 @@ python: # Only two versions for now
 install:
   - pip install numpy
   - pip install matplotlib
-  - pip install skimage
+  - pip install -U scikit-image
   - pip install scipy
   - pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-1.0.0-cp27-none-linux_x86_64.whl
 

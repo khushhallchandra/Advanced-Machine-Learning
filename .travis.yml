@@ -1,0 +1,14 @@
+sudo: required
+dist: trusty
+language: python
+python: # Only two versions for now
+  - "2.7"
+# command to install dependencies
+install:
+  - pip install numpy
+  - pip install matplotlib
+  - pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-1.0.0-cp27-none-linux_x86_64.whl
+
+script:
+  - sed -i -- 's/range(1)/range(1)/g' ??_*.py # change range to 1 for quick testing
+  - python Assignment-4/src/conv_net_relu.py
